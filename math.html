@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Matrix Inverse Calculator</title>
+<style>
+  :root{
+    --ink:#1b2430;
+    --paper:#f6f4ee;
+    --line:#d8d2c4;
+    --accent:#3d5a80;
+    --accent2:#9c6644;
+    --good:#2f6d3f;
+    --bad:#a4333f;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Georgia","Times New Roman",serif;
+    padding:32px 16px 80px;
+  }
+  .wrap{max-width:760px;margin:0 auto;}
+  h1{
+    font-size:1.7rem;
+    letter-spacing:0.5px;
+    margin-bottom:4px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:10px;
+  }
+  .sub{
+    font-family:Arial, sans-serif;
+    font-size:0.85rem;
+    color:#6b6558;
+    margin-bottom:28px;
+  }
+  .panel{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:20px;
+    margin-bottom:22px;
+  }
+  label{
+    font-family:Arial, sans-serif;
+    font-size:0.8rem;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:#6b6558;
+  }
+  select, input[type=number]{
+    font-family:"Courier New", monospace;
+    font-size:1rem;
+    padding:6px 8px;
+    border:1px solid var(--line);
+    border-radius:3px;
+    background:#fffdf9;
+  }
+  #sizeRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  #matrixGrid{
+    display:inline-grid;
+    gap:6px;
+    margin-top:16px;
+  }
+  #matrixGrid input{
+    width:64px;
+    text-align:center;
+  }
+  button{
+    font-family:Arial, sans-serif;
+    font-size:0.9rem;
+    letter-spacing:0.5px;
+    padding:10px 20px;
+    border:none;
+    border-radius:3px;
+    background:var(--accent);
+    color:#fff;
+    cursor:pointer;
+    margin-top:16px;
+    margin-right:8px;
+  }
+  button.secondary{
+    background:transparent;
+    color:var(--accent2);
+    border:1px solid var(--accent2);
+  }
+  button:hover{filter:brightness(1.1);}
+  .result{
+    font-family:"Courier New", monospace;
+    white-space:pre;
+    background:#fbfaf5;
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:16px;
+    overflow-x:auto;
+    line-height:1.5;
+  }
+  .error{color:var(--bad); font-family:Arial, sans-serif;}
+  .ok{color:var(--good); font-family:Arial, sans-serif; font-size:0.85rem; margin-top:8px;}
+  .khmer{
+    font-family:"Khmer OS", "Noto Sans Khmer", Arial, sans-serif;
+    color:#6b6558;
+    font-size:0.85rem;
+    margin-top:4px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Matrix Inverse Calculator</h1>
+  <div class="sub">Computes A⁻¹ for a square matrix using Gauss–Jordan elimination.</div>
+
+  <div class="panel">
+    <div id="sizeRow">
+      <label for="sizeSelect">Matrix size (n × n)</label>
+      <select id="sizeSelect"></select>
+      <button id="buildBtn" type="button">Build grid</button>
+    </div>
+    <div id="matrixGrid"></div>
+    <div>
+      <button id="calcBtn" type="button">Compute Inverse</button>
+      <button id="clearBtn" type="button" class="secondary">Clear</button>
+      <button id="identityBtn" type="button" class="secondary">Fill Identity</button>
+    </div>
+    <div class="khmer">បំពេញតម្លៃក្នុងក្រឡានីមួយៗ រួចចុច "Compute Inverse" ដើម្បីគណនាម៉ាទ្រីសច្រាស។</div>
+  </div>
+
+  <div class="panel">
+    <div id="output" class="result">Result will appear here.</div>
+  </div>
+</div>
+
+<script>
+const sizeSelect = document.getElementById('sizeSelect');
+const matrixGrid = document.getElementById('matrixGrid');
+const output = document.getElementById('output');
+
+for (let i = 2; i <= 6; i++) {
+  const opt = document.createElement('option');
+  opt.value = i;
+  opt.textContent = i + ' x ' + i;
+  sizeSelect.appendChild(opt);
+}
+sizeSelect.value = 3;
+
+function buildGrid() {
+  const n = parseInt(sizeSelect.value, 10);
+  matrixGrid.style.gridTemplateColumns = `repeat(${n}, auto)`;
+  matrixGrid.innerHTML = '';
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      const inp = document.createElement('input');
+      inp.type = 'number';
+      inp.step = 'any';
+      inp.value = (r === c) ? '1' : '0';
+      inp.dataset.row = r;
+      inp.dataset.col = c;
+      matrixGrid.appendChild(inp);
+    }
+  }
+  output.textContent = 'Result will appear here.';
+}
+
+function getMatrix() {
+  const n = parseInt(sizeSelect.value, 10);
+  const inputs = matrixGrid.querySelectorAll('input');
+  const A = Array.from({length: n}, () => new Array(n).fill(0));
+  inputs.forEach(inp => {
+    const r = parseInt(inp.dataset.row, 10);
+    const c = parseInt(inp.dataset.col, 10);
+    const v = parseFloat(inp.value);
+    A[r][c] = isNaN(v) ? 0 : v;
+  });
+  return A;
+}
+
+function fmt(x) {
+  if (Math.abs(x) < 1e-9) x = 0;
+  return Number(x.toFixed(4)).toString();
+}
+
+function invertMatrix(A) {
+  const n = A.length;
+  // Build augmented matrix [A | I]
+  const M = A.map((row, i) => {
+    const idRow = new Array(n).fill(0);
+    idRow[i] = 1;
+    return row.concat(idRow);
+  });
+
+  for (let col = 0; col < n; col++) {
+    // Find pivot row with largest absolute value in this column
+    let pivotRow = col;
+    let maxVal = Math.abs(M[col][col]);
+    for (let r = col + 1; r < n; r++) {
+      if (Math.abs(M[r][col]) > maxVal) {
+        maxVal = Math.abs(M[r][col]);
+        pivotRow = r;
+      }
+    }
+    if (maxVal < 1e-12) {
+      return null; // singular, no inverse
+    }
+    if (pivotRow !== col) {
+      const tmp = M[col];
+      M[col] = M[pivotRow];
+      M[pivotRow] = tmp;
+    }
+    // Normalize pivot row
+    const pivot = M[col][col];
+    for (let c = 0; c < 2 * n; c++) {
+      M[col][c] /= pivot;
+    }
+    // Eliminate other rows
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const factor = M[r][col];
+      if (factor !== 0) {
+        for (let c = 0; c < 2 * n; c++) {
+          M[r][c] -= factor * M[col][c];
+        }
+      }
+    }
+  }
+
+  return M.map(row => row.slice(n));
+}
+
+function printMatrix(A) {
+  const n = A.length;
+  const cellW = 9;
+  let lines = [];
+  for (let r = 0; r < n; r++) {
+    let line = '[ ';
+    for (let c = 0; c < n; c++) {
+      line += fmt(A[r][c]).padStart(cellW, ' ');
+      if (c < n - 1) line += ' ';
+    }
+    line += ' ]';
+    lines.push(line);
+  }
+  return lines.join('\n');
+}
+
+document.getElementById('buildBtn').addEventListener('click', buildGrid);
+document.getElementById('clearBtn').addEventListener('click', () => {
+  matrixGrid.querySelectorAll('input').forEach(inp => inp.value = '0');
+  output.textContent = 'Result will appear here.';
+});
+document.getElementById('identityBtn').addEventListener('click', () => {
+  matrixGrid.querySelectorAll('input').forEach(inp => {
+    const r = parseInt(inp.dataset.row, 10);
+    const c = parseInt(inp.dataset.col, 10);
+    inp.value = (r === c) ? '1' : '0';
+  });
+});
+document.getElementById('calcBtn').addEventListener('click', () => {
+  const A = getMatrix();
+  const inv = invertMatrix(A);
+  if (inv === null) {
+    output.innerHTML = '<span class="error">This matrix is singular — it has no inverse (determinant = 0).</span>';
+    return;
+  }
+  output.textContent =
+    'A =\n' + printMatrix(A) +
+    '\n\nA⁻¹ =\n' + printMatrix(inv);
+});
+
+buildGrid();
+</script>
+</body>
+</html>
